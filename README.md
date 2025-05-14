@@ -9,7 +9,6 @@
 **File2Tape** is a Python library that allows you to encode files into audio signals for storage on cassette tapes and decode them back into their original form. It supports any file type and size, but files under **100KB** are recommended for optimal performance. Currently, there is no built-in compression.<br>
 Estimated file size at write speed 2000 is about 4s per KB.
 
-
 ## ⚙️ Requirements
 - `Python 3.0` or higher
 - `numpy`
@@ -19,7 +18,6 @@ Install the required dependencies using:
 ```bash
 pip install numpy scipy
 ```
-
 
 ## 📼 Usage
 
@@ -42,7 +40,7 @@ th.write("test/test.avif", "test/output.wav")
 
 <p align="center">
   <b>WARNING:</b> The generated audio is loud!<br>
-  <audio style="margin-top: 5px;" controls  src="test/output.wav">Your browser does not support the audio element</audio>
+  <a href="test/output.wav" download>Listen to the generated audio file</a>
 </p>
 
 ### 3. Decode the audio back to the original file
@@ -54,12 +52,6 @@ th.read("test/output.wav", "test/decoded")
 <p align="center">
   <img src="test/test.avif" alt="Original Image" width="300">
 </p>
-
-<p align="center">
-  <b>WARNING:</b> The generated audio is loud! Ensure your volume is low before playing the audio.<br>
-  <audio controls src="test/output.wav"></audio>
-</p>
-
 
 ## 📝 Notes
 - **File size:** Files larger than 100KB can result in very large `.wav` files and longer processing times.
