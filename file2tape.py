@@ -27,8 +27,8 @@ class File2Tape:
         self.WRITE_SPEED = write_speed
 
         self.FREQ_LOW = 1000 # 0
-        self.FREQ_HIGH = 2000 # 1
-        self.FREQ_END = 3000 # end seq frequency
+        self.FREQ_HIGH = 3000 # 1
+        self.FREQ_END = 5000 # end seq frequency
 
         self.SAMPLE_RATE = 44100
         self.DURATION = 1/write_speed
@@ -51,6 +51,26 @@ class File2Tape:
 
         return signal
 
+    def encode_byte_with_hamming(self, byte: int) -> np.ndarray:
+        bits = [(byte >> i) & 1 for i in range(7, -1, -1)]
+        h_bits = [
+            bits[0], bits[1], bits[2],
+            bits[3],
+            bits[4], bits[5], bits[6],
+            0, 0, 0, 0 
+        ]
+        # Pariteta
+        h_bits[8] = h_bits[0] ^ h_bits[1] ^ h_bits[3] ^ h_bits[4]
+        h_bits[9] = h_bits[0] ^ h_bits[2] ^ h_bits[3] ^ h_bits[5]
+        h_bits[10] = h_bits[1] ^ h_bits[2] ^ h_bits[3] ^ h_bits[6]
+        h_bits[11] = h_bits[4] ^ h_bits[5] ^ h_bits[6]
+
+        signal = np.concatenate([
+            self.generate_tone(self.FREQ_HIGH if bit else self.FREQ_LOW, self.DURATION)
+            for bit in h_bits
+        ])
+        return signal
+
     def encode_file_type(self, file_type: str) -> np.ndarray:
         signal = []
 
@@ -58,6 +78,13 @@ class File2Tape:
             signal.append(self.encode_byte(ord(char)))
         signal.append(self.encode_byte(0))
 
+        return np.concatenate(signal)
+
+    def encode_start_sequence(self) -> np.ndarray:
+        signal = []
+        for _ in range(5):  # 5 ciklov hih in low
+            signal.append(self.generate_tone(self.FREQ_HIGH, self.DURATION))
+            signal.append(self.generate_tone(self.FREQ_LOW, self.DURATION))
         return np.concatenate(signal)
 
     def encode_end_sequence(self) -> np.ndarray:
@@ -75,25 +102,22 @@ class File2Tape:
         file_size = os.path.getsize(file_path)
         file_type = os.path.splitext(file_path)[1][1:]
 
-        total_bits = (file_size + len(file_type) + 1) * 8 + 10 * 8
-        total_samples = total_bits * self.BIT_SAMPLES
-        audio_signal = np.zeros(total_samples)
+        audio_signal = []
+        audio_signal.append(self.encode_start_sequence())
 
         file_type_signal = self.encode_file_type(file_type)
-        audio_signal[:len(file_type_signal)] = file_type_signal
-        offset = len(file_type_signal)
+        audio_signal.append(file_type_signal)
 
         with open(file_path, "rb") as f:
             for byte in f.read():
                 byte_signal = self.encode_byte(byte)
-                audio_signal[offset:offset + len(byte_signal)] = byte_signal
-                offset += len(byte_signal)
+                audio_signal.append(byte_signal)
 
         end_signal = self.encode_end_sequence()
+        audio_signal.append(end_signal)
 
-        audio_signal[offset:offset + len(end_signal)] = end_signal
+        audio_signal = np.concatenate(audio_signal)
         audio_signal = audio_signal / np.max(np.abs(audio_signal))
-
         write_wav(output_wav, self.SAMPLE_RATE, (audio_signal * 32767).astype(np.int16))
 
 
@@ -120,6 +144,25 @@ class File2Tape:
 
         return byte
 
+    def decode_byte_with_hamming(self, byte_signal: np.ndarray) -> int:
+        bits = [
+            self.decode_bit(byte_signal[i * self.BIT_SAMPLES:(i + 1) * self.BIT_SAMPLES])
+            for i in range(12)
+        ]
+        # pariteta 2
+        parity_check = [
+            bits[0] ^ bits[1] ^ bits[3] ^ bits[4] ^ bits[8],
+            bits[0] ^ bits[2] ^ bits[3] ^ bits[5] ^ bits[9],
+            bits[1] ^ bits[2] ^ bits[3] ^ bits[6] ^ bits[10],
+            bits[4] ^ bits[5] ^ bits[6] ^ bits[11]
+        ]
+        error_position = sum((1 << i) * parity_check[i] for i in range(4))
+        if error_position > 0:
+            bits[error_position - 1] ^= 1
+        data_bits = [bits[0], bits[1], bits[2], bits[3], bits[4], bits[5], bits[6], bits[7]]
+        byte = sum((bit << (7 - i)) for i, bit in enumerate(data_bits))
+        return byte
+
     def read(self, wav_file: str, output_file: str) -> None:
         if not os.path.exists(wav_file):
             return
@@ -135,6 +178,10 @@ class File2Tape:
         num_bits = len(audio_signal) // self.BIT_SAMPLES
         reading_file_type = True
 
+
+        start_sequence_length = 10 * self.BIT_SAMPLES  # 5 h l
+        audio_signal = audio_signal[start_sequence_length:]
+
         for i in range(0, num_bits, 8):
             byte_signal = audio_signal[i * self.BIT_SAMPLES:(i + 8) * self.BIT_SAMPLES]
             if len(byte_signal) < 8 * self.BIT_SAMPLES:
@@ -149,13 +196,13 @@ class File2Tape:
                     reading_file_type = False
                 else:
                     file_type += chr(decoded_byte)
-
-            else: decoded_data.append(decoded_byte)
+            else:
+                decoded_data.append(decoded_byte)
 
         with open(f"{output_file}.{file_type}", "wb") as f:
             f.write(decoded_data)
 
 if __name__ == "__main__":
-    tape_handler = File2Tape(write_speed=2000)
+    tape_handler = File2Tape(write_speed=1000)
     tape_handler.write("test/test.avif", "test/output.wav")
     tape_handler.read("test/output.wav", "test/decoded")
