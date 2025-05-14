@@ -6,7 +6,8 @@
 </p>
 
 ## 📖 About
-**File2Tape** is a Python library that allows you to encode files into audio signals for storage on cassette tapes and decode them back into their original form. It supports any file type and size, but files under **100KB** are recommended for optimal performance. Currently, there is no built-in compression.
+**File2Tape** is a Python library that allows you to encode files into audio signals for storage on cassette tapes and decode them back into their original form. It supports any file type and size, but files under **100KB** are recommended for optimal performance. Currently, there is no built-in compression.<br>
+Estimated file size at write speed 2000 is about 4s per KB.
 
 
 ## ⚙️ Requirements
