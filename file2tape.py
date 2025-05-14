@@ -203,6 +203,6 @@ class File2Tape:
             f.write(decoded_data)
 
 if __name__ == "__main__":
-    tape_handler = File2Tape(write_speed=1000)
+    tape_handler = File2Tape(write_speed=2000)
     tape_handler.write("test/test.avif", "test/output.wav")
     tape_handler.read("test/output.wav", "test/decoded")
